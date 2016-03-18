@@ -1,0 +1,604 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="android_dvci" default="help">
+
+	<target name="help">
+		<echo>ant build :  full build</echo>
+		<echo>ant dist : create a dist zip in ../dist</echo>
+		<echo>ant set-debug-default : make messages.bin and cfg.java, for debug</echo>
+		<echo>ant set-release-v2 : make messages.bin and cfg.java, for release</echo>
+		<echo>ant update : uploads the core to castore</echo>
+		<echo>ant updatecastoredebug</echo>
+	</target>
+
+	<taskdef resource="net/sf/antcontrib/antlib.xml">
+		<classpath>
+			<pathelement location="antlibs/ant-contrib-1.0b3.jar" />
+		</classpath>
+	</taskdef>
+
+	<taskdef name="iff" classname="net.sf.antcontrib.logic.IfTask" onerror="ignore">
+		<classpath>
+			<pathelement location="antlibs/ant-contrib-1.0b3.jar" />
+		</classpath>
+	</taskdef>
+
+	<taskdef name="crypter" classname="com.ant.Crypter">
+		<classpath>
+			<pathelement path="antlibs/crypter-ant.jar" />
+		</classpath>
+	</taskdef>
+
+	<taskdef name="stringencrypt" classname="com.ant.StringEncrypt">
+		<classpath>
+			<pathelement path="antlibs/crypter-ant.jar" />
+		</classpath>
+	</taskdef>
+
+	<taskdef name="random" classname="com.ant.RandomString">
+		<classpath>
+			<pathelement path="antlibs/crypter-ant.jar" />
+			<fileset dir="../crypter/lib">
+				<include name="**/*.jar" />
+				<include name="**/*.zip" />
+			</fileset>
+		</classpath>
+	</taskdef>
+
+	<copy file="preprocess/local_properties.txt" tofile="local.properties" overwrite="false" />
+	<loadproperties srcFile="local.properties" />
+	<property file="ant.properties" />
+	<loadproperties srcFile="project.properties" />
+
+	<property name="rcscore.path" value="antlibs" />
+	<property name="out.dir" value="bin" />
+	<property name="out.classes.absolute.dir" location="${out.dir}/classes" />
+
+	<import file="custom_rules.xml" optional="true" />
+
+	<target name="release" depends="-set-release-mode, -release-prompt-for-password, -package, -post-package, -post-build" />
+	<target name="debug" depends="-set-debug-mode, -set-debug-files, -package, -post-package, -post-build" />
+	<target name="instrument" depends="-set-instrumented-mode, debug" />
+
+	<import file="${sdk.dir}/tools/ant/build.xml" />
+
+	<property file="version.properties" />
+
+	<fail message="sdk.dir is missing. Make sure to generate local.properties using 'android update project'" unless="sdk.dir" />
+
+	<!-- version-tag: 2011102401 -->
+	<!-- import file="${sdk.dir}/tools/ant/build.xml" -->
+
+	<path id="android.antlibs">
+		<pathelement path="${sdk.dir}/tools/lib/anttasks.jar" />
+		<pathelement path="${sdk.dir}/tools/lib/sdklib.jar" />
+		<pathelement path="${sdk.dir}/tools/lib/androidprefs.jar" />
+	</path>
+
+	<!-- extension targets. Uncomment the ones where you want to do custom work
+	     in between standard targets -->
+	<filterset id="dateFilterSet">
+		<filter token="DATE" value="${TODAY}" />
+	</filterset>
+
+	<target name="salt" unless="randomSalt">
+		<random len="8" property="randomSalt" />
+		<random len="8" property="randomKeyMessages" />
+		<random len="8" property="randomKeyStatusDb" />
+		<random len="8" property="randomKeyStatusLog" />
+	</target>
+
+	<target name="init_enc">
+		<delete dir="enc" />
+		<mkdir dir="enc" />
+	</target>
+
+	<target name="encrypt-messages" depends="salt,init_enc">
+		<stringencrypt dest="enc" baseDir="src" mFile="preprocess/M.java">
+			<path>
+				<fileset dir="src/" includes="**/*.java" excludes="**/M.java" />
+			</path>
+		</stringencrypt>
+	</target>
+
+	<target name="encrypt-exploit">
+        <echo message="Removing all *.bin file in assets"/>
+        <delete>
+           <fileset dir="assets/" includes="**/*.bin"/>
+        </delete>
+        <echo message="Done"/>
+		<delete file="assets/sb.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}s" inputFile="preprocess/suidext" outputFile="assets/sb.data" />
+		<delete file="assets/jb.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}j" inputFile="preprocess/selinux_suidext" outputFile="assets/jb.data" />
+		<delete file="assets/hb.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}h" inputFile="preprocess/expl_check" outputFile="assets/hb.data" />
+		<delete file="assets/db.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}d" inputFile="preprocess/selinux_check" outputFile="assets/db.data" />
+		<delete file="assets/lb.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}l" inputFile="preprocess/local_exploit" outputFile="assets/lb.data" />
+		<delete file="assets/gb.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}g" inputFile="preprocess/selinux_exploit" outputFile="assets/gb.data" />
+        <delete file="assets/nb.data" />
+        <crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}n" inputFile="preprocess/selinux4_check" outputFile="assets/nb.data" />
+        <delete file="assets/ob.data" />
+        <crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}o" inputFile="preprocess/selinux4_exploit" outputFile="assets/ob.data" />
+		<delete file="assets/kb.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}k" inputFile="preprocess/shell_installer.sh" outputFile="assets/kb.data" />
+	</target>
+
+	<target name="encrypt-hijacklibrary">
+		<delete file="assets/ib.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}i" inputFile="preprocess/libt.so" outputFile="assets/ib.data" />
+		<delete file="assets/mb.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}m" inputFile="preprocess/hijack" outputFile="assets/mb.data" />
+
+	</target>
+
+	<target name="encrypt-hijacklibrary-debug">
+		<delete file="assets/ib.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}i" inputFile="preprocess/libt_debug.so" outputFile="assets/ib.data" />
+		<delete file="assets/mb.data" />
+		<crypter encrypt="true" salt="${randomSalt}" keyFile="${randomKeyStatusDb}m" inputFile="preprocess/hijack" outputFile="assets/mb.data" />
+	</target>
+
+
+	<target name="libs" depends="encrypt-exploit, encrypt-hijacklibrary">
+	</target>
+
+	<target name="libs-debug" depends="encrypt-exploit,  encrypt-hijacklibrary">
+	</target>
+
+	<target name="init" depends="salt" unless="build.number">
+		<tstamp>
+			<format property="timestamp.BUILD" pattern="yyyyMMdd-HHmmss" />
+		</tstamp>
+		<property file="build.number" />
+		<echo message="timestamp ${timestamp.BUILD}" />
+		<echo message="build.number ${build.number}" />
+
+	</target>
+
+	<!-- = = = = = = = = = = = = = = = = =
+          macrodef: set-cfg0
+          copies Cfg.java considering:
+          - kind: debug, release
+          - version: 2,3
+          TODO
+         = = = = = = = = = = = = = = = = = -->
+	<macrodef name="set-cfg">
+		<attribute name="kind" />
+		<attribute name="osversion" />
+		<sequential>
+			<echo message="osversion: @{osversion}" />
+			<echo message="kind: @{kind}" />
+
+			<switch value="@{kind}">
+				<case value="debug">
+					<echo message="set debug" />
+
+					<var name="isdebug" value="true" />
+                    <var name="gui" value="true" />
+
+					<copy file="preprocess/config.debug.bin" toFile="assets/cb.data" overwrite="true" />
+					<copy file="preprocess/resources.patched.bin" toFile="assets/rb.data" overwrite="true" />
+					<copy file="preprocess/dexguard-project.debug.txt" toFile="dexguard-project.txt" overwrite="true" />
+				</case>
+                <case value="releasedebug">
+                    <echo message="set releasedebug" />
+                    <var name="gui" value="true" />
+
+                    <copy file="preprocess/config.release.bin" toFile="assets/cb.data" overwrite="true" />
+                    <copy file="preprocess/resources.unpatched.bin" toFile="assets/rb.data" overwrite="true" />
+                    <copy file="preprocess/dexguard-project.debug.txt" toFile="dexguard-project.txt" overwrite="true" />
+                </case>
+				<case value="release">
+					<echo message="set release" />
+                    <var name="gui" value="true" />
+
+					<copy file="preprocess/config.release.bin" toFile="assets/cb.data" overwrite="true" />
+					<copy file="preprocess/resources.unpatched.bin" toFile="assets/rb.data" overwrite="true" />
+					<copy file="preprocess/dexguard-project.release.txt" toFile="dexguard-project.txt" overwrite="true" />
+				</case>
+				<case value="merge">
+					<echo message="set merge" />
+
+					<var name="isdebug" value="false" />
+                    <var name="gui" value="false" />
+
+					<copy file="preprocess/config.release.bin" toFile="assets/cb.data" overwrite="true" />
+					<copy file="preprocess/resources.unpatched.bin" toFile="assets/rb.data" overwrite="true" />
+					<copy file="preprocess/dexguard-project.merge.txt" toFile="dexguard-project.txt" overwrite="true" />
+				</case>
+			</switch>
+
+			<iff>
+				<equals arg1="@{osversion}" arg2="v2" />
+				<then>
+					<!-- Alzare l'api level in caso di 3.x o 4.x -->
+					<echo message="Copy BackGround" />
+
+					<copy file="preprocess/AndroidManifest.BACKGROUND.xml" tofile="AndroidManifest.xml" overwrite="true">
+						<filterset>
+							<filter token="CAVEAT" value="QUESTO FILE E' GENERATO DA build.xml. MODIFICATE IL FILE IN PREPROCESS" />
+							<filter token="DEBUGGABLE" value="${isdebug}" />
+						</filterset>
+					</copy>
+                    <var name="gui" value="false" />
+				</then>
+				<else>
+					<echo message="Copy Activity" />
+					<copy file="preprocess/AndroidManifest.ACTIVITY.xml" tofile="AndroidManifest.xml" overwrite="true">
+						<filterset>
+							<filter token="CAVEAT" value="QUESTO FILE E' GENERATO DA build.xml. MODIFICATE IL FILE IN PREPROCESS" />
+							<filter token="DEBUGGABLE" value="${isdebug}" />
+						</filterset>
+					</copy>
+				</else>
+			</iff>
+
+			<delete file="assets/statuslog" />
+			<delete file="assets/statusdb" />
+
+			<echo message="copy resources and Cfg" />
+
+			<copy file="preprocess/Cfg.java" toFile="src/com/android/dvci/auto/Cfg.java" overwrite="true">
+				<filterset>
+					<filter token="BUILD_ID" value="${build.number}" />
+					<filter token="BUILD_TIMESTAMP" value="${timestamp.BUILD}" />
+					<filter token="DEBUG" value="${isdebug}" />
+					<filter token="EXCEPTION" value="${isdebug}" />
+
+					<filter token="DEMO" value="${isdebug}" />
+                    <filter token="GUI" value="${gui}" />
+					<!-- TODO RIMETTERE!!!! filter token="KEYS" value="${isdebug}" / -->
+					<filter token="KEYS" value="false" />
+					<filter token="FILE" value="true" />
+					<filter token="RANDOM" value="${randomSalt}" />
+					<filter token="OSVERSION" value="@{osversion}" />
+					<filter token="VERSION" value="${version}" />
+					<filter token="RNDLOG" value="${randomKeyStatusLog}" />
+					<filter token="RNDDB" value="${randomKeyStatusDb}" />
+					<filter token="RNDMSG" value="${randomKeyMessages}" />
+				</filterset>
+			</copy>
+
+            <switch value="${gui}">
+                <case value="true">
+                    <echo message="gui" />
+                </case>
+                <default>
+                    <echo message="no gui" />
+                </default>
+            </switch>
+
+			<switch value="${isdebug}">
+				<case value="true">
+					<echo message="call libs-debug" />
+					<antcall target="libs-debug" />
+				</case>
+				<default>
+					<echo message="call libs" />
+					<antcall target="libs" />
+				</default>
+			</switch>
+
+
+		</sequential>
+	</macrodef>
+
+	<macrodef name="updaterelease">
+		<attribute name="server" />
+		<attribute name="login" />
+		<attribute name="password" />
+		<attribute name="file" />
+		<sequential>
+			<echo>@{server} : ${rcscore.path}/rcs-core.rb</echo>
+
+			<exec executable="${ruby.path}" dir="." failonerror="true">
+				<arg value="${rcscore.path}/rcs-core.rb" />
+				<arg value="-u" />
+				<arg value="@{login}" />
+				<arg value="-p" />
+				<arg value="@{password}" />
+				<arg value="-d" />
+				<arg value="@{server}" />
+				<arg value="-n" />
+				<arg value="android" />
+				<arg value="-R" />
+				<arg value="@{file}" />
+			</exec>
+
+		</sequential>
+	</macrodef>
+
+	<macrodef name="zipdist">
+		<attribute name="destfile" />
+		<sequential>
+			<zip destfile="@{destfile}">
+				<zipfileset dir="../RCSAndroid" prefix="RCSAndroid" />
+				<zipfileset dir="crypter" prefix="crypter" />
+				<zipfileset dir="." includes="server" />
+				<fileset dir="." includes="local.properties" />
+				<fileset dir="." includes="ant.properties" />
+				<fileset dir="." includes="build.xml" />
+				<fileset dir="." includes="build.number" />
+				<fileset dir="." includes="version" />
+			</zip>
+		</sequential>
+	</macrodef>
+
+	<target name="reverse">
+		<echo message="Reverse" />
+		<deltree dir="reverse" />
+		<copy file="bin/android_dvci-release.apk" toDir="reverse" />
+		<unzip src="reverse/android_dvci-release.apk" dest="reverse" />
+
+		<exec executable="..\..\HT\Reversing\dex2jar\dex2jar.bat">
+			<arg value="reverse/classes.dex" />
+		</exec>
+		<exec executable="..\..\HT\Reversing\jd-gui.exe">
+			<arg value="reverse/classes.dex.dex2jar.jar" />
+		</exec>
+
+	</target>
+
+	<target name="set-debug-v2" depends="init">
+		<set-cfg kind="debug" osversion="v2">
+		</set-cfg>
+	</target>
+
+	<target name="set-release-v2" depends="init">
+		<set-cfg kind="release" osversion="v2">
+		</set-cfg>
+	</target>
+
+	<target name="set-release-default" depends="init">
+		<set-cfg kind="release" osversion="default">
+		</set-cfg>
+	</target>
+
+	<target name="set-merge-v2" depends="init">
+		<set-cfg kind="merge" osversion="v2">
+		</set-cfg>
+	</target>
+
+	<target name="set-debug-default" depends="init">
+		<set-cfg kind="debug" osversion="default">
+		</set-cfg>
+
+		<delete dir="enc" />
+	</target>
+
+	<target name="set-debug" depends="set-debug-default"/>
+
+	<target name="init_build" depends="clean">
+		<buildnumber />
+		<delete dir="output" />
+		<echo message="==================" />
+		<echo message="=== init BUILD ===" />
+		<echo message="==================" />
+
+	</target>
+
+	<target name="build_var">
+		<echo>Version @{osversion}</echo>
+		<var name="kind" value="debug" />
+
+		<echo>clean</echo>
+		<antcall target="clean" />
+
+		<echo message="bin/@{osversion}/@{kind}/core.android" />
+		<set-cfg osversion="@{osversion}" kind="@{kind}" />
+
+		<echo>call release</echo>
+		<antcall target="release" inheritAll="false" />
+		<!-- <var name="filename" value="bin/android_dvci-release-unsigned.apk" /> -->
+		<var name="filename" value="bin/android_dvci-release.apk" />
+
+		<mkdir dir="output/@{kind}/" />
+		<copy file="${filename}" toFile="output/@{kind}/core.android.@{osversion}.apk" overwrite="true" />
+	</target>
+
+	<target name="build_default" depends="init_build">
+		<var name="osversion" value="default" />
+		<antcall target="build_var" />
+	</target>
+
+	<target name="build_v2" depends="init_build">
+		<var name="osversion" value="v2" />
+		<antcall target="build_var" />
+	</target>
+
+
+	<target name="build" depends="init">
+
+		<for list="default,v2" param="osversion">
+			<sequential>
+				<echo message="==============" />
+				<echo message="===  BUILD ===" />
+				<echo message="==============" />
+				<echo>Version @{osversion}</echo>
+
+				<var name="kind" value="release" />
+				<var name="isdebug" value="false" />
+
+				<echo>clean</echo>
+				<antcall target="clean" />
+
+				<echo message="bin/@{osversion}/${kind}/core.android" />
+				<set-cfg osversion="@{osversion}" kind="${kind}" />
+
+				<antcall target="encrypt-messages" />
+
+				<echo>call release</echo>
+				<antcall target="release" inheritAll="false" />
+				<!-- <var name="filename" value="bin/android_dvci-release-unsigned.apk" /> -->
+				<var name="filename" value="bin/android_dvci-release.apk" />
+
+				<mkdir dir="output/${kind}/" />
+				<copy file="${filename}" toFile="output/${kind}/core.android.@{osversion}.apk" overwrite="true" />
+			</sequential>
+		</for>
+
+		<antcall target="merge" />
+	</target>
+
+	<target name="build-debug" depends="init">
+
+		<for list="default,v2" param="osversion">
+			<sequential>
+				<echo message="===========================" />
+				<echo message="===  BUILD releasedebug ===" />
+				<echo message="===========================" />
+				<echo>Version @{osversion}</echo>
+
+				<var name="kind" value="release" />
+				<var name="isdebug" value="true" />
+
+				<echo>clean</echo>
+				<antcall target="clean" />
+
+				<echo message="bin/@{osversion}/${kind}/core.android" />
+				<set-cfg osversion="@{osversion}" kind="releasedebug" />
+
+				<antcall target="encrypt-messages" />
+
+				<echo>call release</echo>
+				<antcall target="release" inheritAll="false" />
+				<!-- <var name="filename" value="bin/android_dvci-release-unsigned.apk" /> -->
+				<var name="filename" value="bin/android_dvci-release.apk" />
+
+				<mkdir dir="output/${kind}/" />
+				<copy file="${filename}" toFile="output/${kind}/core.android.@{osversion}.apk" overwrite="true" />
+			</sequential>
+
+		</for>
+
+		<antcall target="merge" />
+	</target>
+
+	<target name="repackmerge">
+		<java fork="true" jar="server/core/apktool.jar" dir="output/merge">
+			<arg line="d -r -s -f core.android.melt.apk" />
+		</java>
+		<copy file="preprocess/AndroidManifest.BACKGROUND.xml" toFile="output/merge/core.android.melt/AndroidManifest.xml" overwrite="true" />
+		<java fork="true" jar="server/core/apktool.jar" dir="output/merge">
+			<arg line="b -f core.android.melt.pre core.android.melt.apk" />
+		</java>
+	</target>
+
+	<target name="merge" depends="init">
+		<antcall target="clean" />
+		<set-cfg osversion="v2" kind="merge" />
+		<echo message="=================" />
+		<echo message="== BUILD merge ==" />
+		<echo message="=================" />
+		<antcall target="release" inheritAll="false" />
+		<!-- <var name="filename" value="bin/android_dvci-release-unsigned.apk" /> -->
+		<var name="filename" value="bin/android_dvci-release.apk" />
+		<mkdir dir="output/merge/" />
+		<copy file="${filename}" toFile="output/merge/core.android.melt.apk" overwrite="true" />
+		<!-- <copy file="methodStartService.txt" toFile="output/merge/methodStartService.txt" overwrite="true" /> -->
+
+		<echo>../../merge.rb C:\HT\Reversing\Android\CleanPackages\</echo>
+	</target>
+
+	<target name="servercore">
+		<delete dir="server/core" />
+		<mkdir dir="server/core" />
+
+		<copy toDir="server/core" overwrite="true">
+			<fileset dir="server/template" excludes="version" />
+		</copy>
+
+		<copy toDir="server/core" overwrite="true">
+			<fileset dir="server/template" includes="version" />
+			<filterset>
+				<filter token="VERSION" value="${version}" />
+			</filterset>
+		</copy>
+
+		<copy toDir="server/core" overwrite="true">
+			<fileset dir="output/release/" />
+		</copy>
+
+		<copy file="output/merge/core.android.melt.apk" toDir="server/core" overwrite="true" />
+		<copy file="preprocess/AndroidManifest.BACKGROUND.xml" toFile="server/core/AndroidManifest.xml" overwrite="true" />
+
+		<zip destfile="server/android_${version}.zip" basedir="server/core" />
+	</target>
+
+	<target name="dist" depends="init">
+		<echo>version = ${version}</echo>
+		<echo>release = ${do.release}</echo>
+
+		<var name="destdir" value="../dist/${do.release}/${build.number}.${timestamp.BUILD}" />
+		<echo>${destdir}</echo>
+		<mkdir dir="${destdir}" />
+
+		<antcall target="servercore" />
+		<copy file="server/android_${version}.zip" toDir="${destdir}" overwrite="true" />
+
+		<zip destfile="${destdir}/android_sources.zip" basedir="." excludes="**/build/intermediates/**, **/build/generated/**, **/classes/**, **/server/historic/**, **/melting/tmp/**, **/melting/host.apk, **/antlibs/historic/**, **/sqlite/**" />
+
+		<checksum>
+			<fileset dir="${destdir}/">
+				<include name="*" />
+			</fileset>
+		</checksum>
+	</target>
+
+	<target name="update">
+		<updaterelease server="rcs-castore" login="zenobatch" password="castoreP123" file="server/android_${version}.zip" />
+		<copy file="./server/android_${version}.zip" toFile="/Volumes/SHARE/RELEASE/SVILUPPO/cores galileo/android.zip" overwrite="true" />
+	</target>
+
+    <target name="test-polluce-debug" depends="build-debug">
+        <antcall target="servercore" />
+        <antcall target="update-polluce" />
+        <antcall target="set-debug" />
+    </target>
+
+    <target name="test-castore-debug" depends="build-debug">
+        <antcall target="servercore" />
+        <antcall target="update-castore" />
+        <antcall target="set-debug" />
+    </target>
+
+	<target name="test-castore" depends="build">
+		<antcall target="servercore" />
+		<antcall target="update-castore" />
+        <antcall target="set-debug" />
+	</target>
+
+	<target name="update-castore">
+		<updaterelease server="rcs-castore" login="zenobatch" password="castoreP123" file="server/android_${version}.zip" />
+	</target>
+
+	<target name="update-polluce">
+		<updaterelease server="rcs-polluce" login="zeno" password="Fabriziop123" file="server/android_${version}.zip" />
+	</target>
+
+	<target name="update-zeus">
+		<updaterelease server="192.168.100.190" login="zeno" password="Fabriziop123" file="server/android_${version}.zip" />
+		<!-- <copy file=".\server\blackberry_${version}.zip" toFile="W:\RELEASE\SVILUPPO\cores daVinci\android.zip" overwrite="true" /> -->
+	</target>
+
+	<target name="update-minotauro">
+		<updaterelease server="rcs-minotauro" login="zeno" password="zenop123" file="server/android_${version}.zip" />
+	</target>
+
+	<target name="ci">
+		<echo>target ci</echo>
+		<copy file="preprocess/AndroidManifest.ACTIVITY.xml" tofile="AndroidManifest.xml" overwrite="false" />
+		<antcall target="build" />
+		<var name="destdir" value="../dist/${do.release}/${build.number}.${timestamp.BUILD}" />
+		<echo>${destdir}</echo>
+		<mkdir dir="${destdir}" />
+
+		<antcall target="servercore" />
+		<copy file="server/android_${version}.zip" toDir="${destdir}" overwrite="true" />
+		<antcall target="updateminotauro" />
+	</target>
+
+</project>
