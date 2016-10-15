@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module external.system.id="GRADLE" type="JAVA_MODULE" version="4">
+  <component name="FacetManager">
+    <facet type="android-gradle" name="Android-Gradle">
+      <configuration>
+        <option name="GRADLE_PROJECT_PATH" value=":" />
+      </configuration>
+    </facet>
+    <facet type="android" name="Android">
+      <configuration>
+        <option name="ALLOW_USER_CONFIGURATION" value="false" />
+      </configuration>
+    </facet>
+  </component>
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$" />
+    <orderEntry type="jdk" jdkName="1.8" jdkType="JavaSDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
+<?xml version="1.0" encoding="UTF-8"?>
+<root isBackward="false">
+  <file path="$PROJECT_DIR$/.gitattributes" />
+  <file path="$PROJECT_DIR$/.gitignore" />
+  <file path="$PROJECT_DIR$/.project" />
+  <file path="$PROJECT_DIR$/data base management" />
+  <file path="$PROJECT_DIR$/data delivery" />
+  <file path="$PROJECT_DIR$/mylibrary/.gitignore" />
+  <file path="$PROJECT_DIR$/mylibrary/build.gradle" />
+  <file path="$PROJECT_DIR$/mylibrary/proguard-rules.pro" />
+  <file path="$PROJECT_DIR$/mylibrary/src/main/AndroidManifest.xml" />
+  <file path="$PROJECT_DIR$/mylibrary/src/main/res/values/strings.xml" />
+  <file path="$PROJECT_DIR$/settings.gradle" />
+  <file path="$PROJECT_DIR$/system manager" />
+</root>
+
